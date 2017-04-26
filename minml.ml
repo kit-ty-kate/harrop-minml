@@ -42,7 +42,8 @@ let program, run =
 
 open Llvm
 
-let ty = i64_type
+let c = global_context ()
+let ty = i64_type c
 
 let ( |> ) x f = f x
 
@@ -51,8 +52,8 @@ type state =
       blk: llbasicblock;
       vars: (string * llvalue) list }
 
-let bb state = builder_at_end state.blk
-let new_block state name = append_block name state.fn
+let bb state = builder_at_end c state.blk
+let new_block state name = append_block c name state.fn
 let find state v =
   try List.assoc v state.vars with Not_found ->
     eprintf "Unknown variable %s\n" v;
@@ -70,7 +71,7 @@ let rec expr state = function
       let build, name = match op with
         | `Add -> build_add, "add"
         | `Sub -> build_sub, "sub"
-        | `Leq -> build_icmp Icmp_sle, "leq" in
+        | `Leq -> build_icmp Icmp.Sle, "leq" in
       build f g name (bb state), state
   | If(p, t, f) ->
       let t_blk = new_block state "pass" in
@@ -99,18 +100,18 @@ let defn m vars = function
 let int n = const_int ty n
 
 let main filename =
-  let m = create_module filename in
+  let m = create_module c filename in
 
-  let string = pointer_type i8_type in
+  let string = pointer_type (i8_type c) in
 
   let print =
     declare_function "printf" (var_arg_function_type ty [|string|]) m in
 
   let main = define_function "main" (function_type ty [| |]) m in
   let blk = entry_block main in
-  let bb = builder_at_end blk in
+  let bb = builder_at_end c blk in
 
-  let str s = define_global "buf" (const_stringz s) m in
+  let str s = define_global "buf" (const_stringz c s) m in
   let int_spec = build_gep (str "%d\n") [| int 0; int 0 |] "int_spec" bb in
 
   let vars = List.fold_left (defn m) [] program in
