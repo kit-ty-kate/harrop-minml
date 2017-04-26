@@ -1,0 +1,5 @@
+true: package(llvm)
+true: package(llvm.bitwriter)
+true: syntax(camlp4o)
+true: package(camlp4.lib)
+true: package(camlp4.extend)
