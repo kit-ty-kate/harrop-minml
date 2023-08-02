@@ -1,0 +1,7 @@
+(executable
+ (name minml)
+ (modules_without_implementation ast)
+ (libraries llvm llvm.bitwriter))
+
+(ocamllex lexer)
+(menhir (modules parser))

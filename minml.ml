@@ -1,48 +1,25 @@
-type expr =
-  | Int of int
-  | Var of string
-  | BinOp of [ `Add | `Sub | `Leq ] * expr * expr
-  | If of expr * expr * expr
-  | Apply of expr * expr
-
-type defn =
-  | LetRec of string * string * expr
-
-open Camlp4.PreCast
-
-let expr = Gram.Entry.mk "expr"
-let defn = Gram.Entry.mk "defn"
-let prog = Gram.Entry.mk "prog"
-
-EXTEND Gram
-  expr:
-  [ [ "if"; p = expr; "then"; t = expr; "else"; f = expr ->
-        If(p, t, f) ]
-  | [ e1 = expr; "<="; e2 = expr -> BinOp(`Leq, e1, e2) ]
-  | [ e1 = expr; "+"; e2 = expr -> BinOp(`Add, e1, e2)
-    | e1 = expr; "-"; e2 = expr -> BinOp(`Sub, e1, e2) ]
-  | [ f = expr; x = expr -> Apply(f, x) ]
-  | [ v = LIDENT -> Var v
-    | n = INT -> Int(int_of_string n)
-    | "("; e = expr; ")" -> e ] ];
-  defn:
-  [ [ "let"; "rec"; f = LIDENT; x = LIDENT; "="; body = expr ->
-        LetRec(f, x, body) ] ];
-  prog:
-  [ [ defns = LIST0 defn; "do"; run = expr -> defns, run ] ];
-END
-
+open Ast
 open Printf
 
 let program, run =
-  try Gram.parse prog Loc.ghost (Stream.of_channel stdin) with
-  | Loc.Exc_located(loc, e) ->
-      printf "%s at line %d\n" (Printexc.to_string e) (Loc.start_line loc);
+  let filebuf = Lexing.from_channel stdin in
+  let get_offset () =
+    let pos = Lexing.lexeme_start_p filebuf in
+    let open Lexing in
+    let column = pos.pos_cnum - pos.pos_bol in
+    string_of_int pos.pos_lnum ^ ":" ^ string_of_int column
+  in
+  try Parser.prog Lexer.main filebuf with
+  | Lexer.Error | Parser.Error ->
+      printf "Error at line %s\n" (get_offset ());
       exit 1
 
 open Llvm
 
+[@@@ocaml.warning "-3"] (* TODO: Remove this when LLVM 16 is available *)
+
 let c = global_context ()
+let () = set_opaque_pointers c false
 let ty = i64_type c
 
 let ( |> ) x f = f x
