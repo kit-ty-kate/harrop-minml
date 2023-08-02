@@ -16,7 +16,10 @@ let program, run =
 
 open Llvm
 
+[@@@ocaml.warning "-3"] (* TODO: Remove this when LLVM 16 is available *)
+
 let c = global_context ()
+let () = set_opaque_pointers c false
 let ty = i64_type c
 
 let ( |> ) x f = f x
